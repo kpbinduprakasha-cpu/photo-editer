@@ -19,5 +19,8 @@ def test_health_endpoint():
 def test_root_endpoint():
     response = client.get("/")
     assert response.status_code == 200
-    data = response.json()
+
+    api_resp = client.get("/api")
+    assert api_resp.status_code == 200
+    data = api_resp.json()
     assert "FotoOwl" in data["service"]

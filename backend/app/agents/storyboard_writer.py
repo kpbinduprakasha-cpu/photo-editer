@@ -101,12 +101,57 @@ Ensure total duration of all scenes equals approximately {target_duration} secon
 
     # Fallback algorithmic director if LLM did not return complete storyboard
     if not storyboard_dict or not storyboard_dict.get("scenes"):
-        add_job_log(
-            job_id,
-            "Storyboard Writer",
-            "Applying algorithmic cinematic pacing and transition rhythm.",
-            "info",
-        )
+        # Detect aggregate dominant theme from all image analyses
+        themes = [a.get("detected_theme") for a in analyses if a.get("detected_theme")]
+        wedding_count = sum(1 for t in themes if t == "wedding")
+        nature_count = sum(1 for t in themes if t == "nature")
+        celebration_count = sum(1 for t in themes if t == "celebration")
+
+        prompt_l = (prompt or "").lower()
+        if "wedding" in prompt_l or "marriage" in prompt_l or wedding_count >= 1:
+            dominant_theme = "wedding"
+            music_mood = "wedding"
+            default_title = "Eternal Love: A Wedding Celebration"
+            captions_pool = [
+                "Two hearts, one timeless journey",
+                "Promises made in love and faith",
+                "Dancing under a canopy of dreams",
+                "Surrounded by those we cherish most",
+                "A lifetime of happiness begins now",
+            ]
+        elif "nature" in prompt_l or "landscape" in prompt_l or nature_count >= 2:
+            dominant_theme = "nature"
+            music_mood = "nature"
+            default_title = "Wonders of the Natural World"
+            captions_pool = [
+                "Breathtaking horizons stretching to infinity",
+                "The calm tranquility of the wild",
+                "Sunlight weaving through ancient forests",
+                "Where water meets stone in silent wonder",
+                "Nature in its purest, untamed harmony",
+            ]
+        elif "party" in prompt_l or "celebrat" in prompt_l or celebration_count >= 1 or style == "energetic":
+            dominant_theme = "celebration"
+            music_mood = "celebration"
+            default_title = "Unforgettable Celebration Vibes"
+            captions_pool = [
+                "Lighting up the night with pure energy",
+                "Cherished memories with our favorite people",
+                "Laughter, music, and golden sparkles",
+                "Here's to tonight and all that comes next",
+                "The night we will never forget",
+            ]
+        else:
+            dominant_theme = "cinematic"
+            music_mood = "cinematic"
+            default_title = prompt[:40] if prompt else "Moments in Motion"
+            captions_pool = [
+                "Moments that define our story",
+                "A visual tapestry of memories",
+                "Light, emotion, and candid joy",
+                "Holding on to what matters most",
+                "Every picture tells a thousand tales",
+            ]
 
         duration_per_scene = round(target_duration / max(1, total_images), 2)
         transitions = ["fade", "slide_left", "zoom_in", "slide_right"]
@@ -114,9 +159,9 @@ Ensure total duration of all scenes equals approximately {target_duration} secon
 
         scenes: List[Dict[str, Any]] = []
         for i, a in enumerate(analyses):
-            cap = a.get("suggested_caption") if captions_enabled else ""
-            if not cap and captions_enabled:
-                cap = f"{a.get('subject', 'Moments captured')}"
+            cap = a.get("suggested_caption")
+            if not cap or not captions_enabled:
+                cap = captions_pool[i % len(captions_pool)] if captions_enabled else ""
 
             scenes.append(
                 {
@@ -128,16 +173,16 @@ Ensure total duration of all scenes equals approximately {target_duration} secon
                     "transition": transitions[i % len(transitions)],
                     "ken_burns_effect": effects[i % len(effects)],
                     "visual_focus": a.get("subject"),
-                    "overlay_title": prompt[:30] if i == 0 else None,
+                    "overlay_title": default_title[:32] if i == 0 else None,
                 }
             )
 
         storyboard_dict = {
-            "title": prompt[:40] if prompt else "Moments in Motion",
+            "title": default_title,
             "aspect_ratio": aspect_ratio,
             "style": style,
             "total_duration_seconds": target_duration,
-            "background_music_mood": "cinematic ambient",
+            "background_music_mood": music_mood,
             "scenes": scenes,
         }
 

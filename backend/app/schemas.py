@@ -88,6 +88,7 @@ class JobResponse(BaseModel):
     script: Optional[Dict[str, Any]] = None
     output_video_path: Optional[str] = None
     download_url: Optional[str] = None
+    stream_url: Optional[str] = None
     created_at: str
     updated_at: str
     image_count: int = 0

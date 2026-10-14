@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api.health import router as health_router
 from app.api.jobs import router as jobs_router
 from app.api.models import router as models_router
+from app.api.samples import router as samples_router
 from app.api.uploads import router as uploads_router
 from app.config import FRONTEND_DIST_DIR, OUTPUT_DIR, UPLOAD_DIR
 from app.database import init_db
@@ -58,6 +59,7 @@ app.include_router(health_router)
 app.include_router(uploads_router)
 app.include_router(jobs_router)
 app.include_router(models_router)
+app.include_router(samples_router)
 
 # Mount Frontend Assets for All-in-One Serving
 assets_dir = FRONTEND_DIST_DIR / "assets"

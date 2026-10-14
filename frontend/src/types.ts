@@ -41,6 +41,9 @@ export interface ImageItem {
     relevance_score?: number;
     tags?: string[];
     suggested_caption?: string;
+    detected_theme?: string;
+    faces_detected?: number;
+    focal_point?: [number, number];
   };
 }
 
@@ -81,9 +84,24 @@ export interface Job {
   script?: any;
   output_video_path?: string;
   download_url?: string;
+  stream_url?: string;
   created_at: string;
   updated_at: string;
   image_count: number;
+}
+
+export interface SamplePack {
+  id: string;
+  name: string;
+  description: string;
+  badge: string;
+  theme: string;
+  suggested_prompt: string;
+  aspect_ratio: string;
+  style: string;
+  music_mood: string;
+  duration_seconds: number;
+  files: { filename: string; label: string }[];
 }
 
 export interface LogEntry {

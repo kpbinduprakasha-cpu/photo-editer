@@ -99,13 +99,16 @@ async def run_renderer(state: VideoGenerationState) -> Dict[str, Any]:
     # If Remotion didn't render (or wasn't configured), use the native FFmpeg slideshow renderer
     if not rendered_ok:
         render_method = "Native FFmpeg Compositor"
-        add_job_log(job_id, "Renderer", f"Rendering with {render_method}...", "info")
+        storyboard = state.get("storyboard") or {}
+        music_mood = storyboard.get("background_music_mood", "cinematic")
+        add_job_log(job_id, "Renderer", f"Rendering with {render_method} (Audio mood: {music_mood})...", "info")
         success, msg = render_slideshow_mp4(
             image_paths=image_paths,
             output_mp4=output_mp4_path,
             aspect_ratio=aspect_ratio,
             duration_per_image=duration_per_image,
             with_music=music_enabled,
+            music_mood=music_mood,
             scenes_metadata=scenes,
         )
         if not success:

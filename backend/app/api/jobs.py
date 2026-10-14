@@ -51,6 +51,7 @@ async def create_new_job(req: JobCreateRequest) -> JobResponse:
         script=job.get("script"),
         output_video_path=job.get("output_video_path"),
         download_url=f"/api/jobs/{job['id']}/download" if job.get("output_video_path") else None,
+        stream_url=f"/api/jobs/{job['id']}/stream" if job.get("output_video_path") else None,
         created_at=job["created_at"],
         updated_at=job["updated_at"],
         image_count=0,
@@ -78,6 +79,7 @@ async def get_all_jobs() -> List[JobResponse]:
                 progress_pct=j["progress_pct"],
                 output_video_path=j.get("output_video_path"),
                 download_url=f"/api/jobs/{j['id']}/download" if j.get("output_video_path") else None,
+                stream_url=f"/api/jobs/{j['id']}/stream" if j.get("output_video_path") else None,
                 created_at=j["created_at"],
                 updated_at=j["updated_at"],
                 image_count=len(images),
@@ -110,6 +112,7 @@ async def get_job_details(job_id: str) -> JobResponse:
         script=job.get("script"),
         output_video_path=job.get("output_video_path"),
         download_url=f"/api/jobs/{job_id}/download" if job.get("output_video_path") else None,
+        stream_url=f"/api/jobs/{job_id}/stream" if job.get("output_video_path") else None,
         created_at=job["created_at"],
         updated_at=job["updated_at"],
         image_count=len(images),
@@ -180,7 +183,35 @@ async def get_job_execution_logs(job_id: str) -> List[LogEntry]:
     ]
 
 
+@router.get("/{job_id}/stream")
+@router.head("/{job_id}/stream")
+async def stream_rendered_video(job_id: str):
+    """Stream the compiled MP4 video reel inline with partial content (Range) support for browsers."""
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+
+    output_path_str = job.get("output_video_path")
+    if not output_path_str:
+        raise HTTPException(status_code=404, detail="Video reel has not been generated yet.")
+
+    video_file = Path(output_path_str)
+    if not video_file.exists() or video_file.stat().st_size == 0:
+        raise HTTPException(status_code=404, detail="Rendered video file is missing on server.")
+
+    return FileResponse(
+        path=str(video_file),
+        media_type="video/mp4",
+        headers={
+            "Accept-Ranges": "bytes",
+            "Content-Disposition": "inline",
+            "Cache-Control": "public, max-age=3600",
+        },
+    )
+
+
 @router.get("/{job_id}/download")
+@router.head("/{job_id}/download")
 async def download_rendered_video(job_id: str):
     """Stream or download the compiled MP4 video reel."""
     job = get_job(job_id)

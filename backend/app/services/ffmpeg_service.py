@@ -80,25 +80,73 @@ def probe_video(file_path: Path) -> Dict[str, Any]:
         return {"valid": False, "error": str(e)}
 
 
-def generate_ambient_music(output_wav: Path, duration_seconds: float) -> bool:
-    """Generate subtle ambient cinematic chord background audio using FFmpeg synthesis."""
+def generate_ambient_music(output_wav: Path, duration_seconds: float, mood: str = "cinematic") -> bool:
+    """Generate rich, harmonic background music matching wedding, nature, celebration, or cinematic mood."""
     if not FFMPEG_BINARY:
         return False
     try:
-        # Generates a pleasant ambient harmonic drone (chord of 220Hz, 330Hz, 440Hz with soft envelope)
-        lavfi = (
-            f"aevalsrc='0.15*sin(2*PI*220*t) + 0.12*sin(2*PI*329.63*t) + 0.1*sin(2*PI*440*t)':d={duration_seconds}"
-        )
+        mood_lower = (mood or "cinematic").lower()
+
+        if "wedding" in mood_lower or "romantic" in mood_lower:
+            # 💒 Romantic Wedding: Sweet acoustic harp & chime arpeggios (Cmaj7 -> Fmaj7)
+            lavfi = (
+                f"aevalsrc='0.16*sin(2*PI*261.63*t)*exp(-2.5*mod(t,2)) + "
+                f"0.14*sin(2*PI*329.63*t)*exp(-2.2*mod(t,2)) + "
+                f"0.12*sin(2*PI*392.00*t)*exp(-2.0*mod(t,2)) + "
+                f"0.10*sin(2*PI*493.88*t)*exp(-3.0*mod(t+0.5,2)) + "
+                f"0.08*sin(2*PI*523.25*t)*exp(-3.5*mod(t+1.0,2))':d={duration_seconds}"
+            )
+            vol = "0.45"
+        elif "nature" in mood_lower or "scenic" in mood_lower:
+            # 🌲 Serene Nature: Flowing pastoral acoustic guitar & harmonic breeze (G -> Em)
+            lavfi = (
+                f"aevalsrc='0.14*sin(2*PI*196.00*t)*exp(-1.8*mod(t,2.5)) + "
+                f"0.12*sin(2*PI*246.94*t)*exp(-1.5*mod(t,2.5)) + "
+                f"0.11*sin(2*PI*293.66*t)*exp(-1.5*mod(t,2.5)) + "
+                f"0.09*sin(2*PI*392.00*t)*exp(-2.2*mod(t+1.2,2.5)) + "
+                f"0.05*sin(2*PI*587.33*t)*exp(-3.0*mod(t+1.8,2.5))':d={duration_seconds}"
+            )
+            vol = "0.40"
+        elif "celebration" in mood_lower or "party" in mood_lower or "upbeat" in mood_lower:
+            # 🎉 Upbeat Celebration: Syncopated 120 BPM rhythmic bass pulses and festive brass stabs
+            lavfi = (
+                f"aevalsrc='0.20*sin(2*PI*110.00*t)*exp(-6.0*mod(t,0.5)) + "
+                f"0.15*sin(2*PI*220.00*t)*exp(-5.0*mod(t+0.25,0.5)) + "
+                f"0.12*sin(2*PI*440.00*t)*exp(-4.0*mod(t,1.0)) + "
+                f"0.10*sin(2*PI*554.37*t)*exp(-3.5*mod(t+0.5,1.0)) + "
+                f"0.08*sin(2*PI*659.25*t)*exp(-4.5*mod(t+0.75,1.0))':d={duration_seconds}"
+            )
+            vol = "0.50"
+        elif "aesthetic" in mood_lower or "lofi" in mood_lower:
+            # ☕ Lo-Fi Aesthetic: Warm Rhodes major 7th chord cadence (Fmaj7)
+            lavfi = (
+                f"aevalsrc='0.16*sin(2*PI*174.61*t)*exp(-1.2*mod(t,3)) + "
+                f"0.13*sin(2*PI*220.00*t)*exp(-1.2*mod(t,3)) + "
+                f"0.11*sin(2*PI*261.63*t)*exp(-1.2*mod(t,3)) + "
+                f"0.09*sin(2*PI*329.63*t)*exp(-2.0*mod(t+1.5,3))':d={duration_seconds}"
+            )
+            vol = "0.42"
+        else:
+            # 🎬 Cinematic Ambient: Deep resonant orchestral drone & shimmering 5th swell
+            lavfi = (
+                f"aevalsrc='0.18*sin(2*PI*110.00*t) + "
+                f"0.14*sin(2*PI*164.81*t) + "
+                f"0.12*sin(2*PI*220.00*t) + "
+                f"0.08*sin(2*PI*329.63*t + 0.5*sin(2*PI*0.2*t)) + "
+                f"0.06*sin(2*PI*440.00*t)':d={duration_seconds}"
+            )
+            vol = "0.38"
+
         cmd = [
             FFMPEG_BINARY,
             "-y",
             "-f", "lavfi",
             "-i", lavfi,
-            "-af", f"afade=t=in:ss=0:d=1,afade=t=out:st={max(0.1, duration_seconds - 1.5)}:d=1.5,volume=0.4",
+            "-af", f"afade=t=in:ss=0:d=1.5,afade=t=out:st={max(0.1, duration_seconds - 2.0)}:d=2.0,volume={vol}",
             "-c:a", "pcm_s16le",
             str(output_wav),
         ]
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20)
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=25)
         return res.returncode == 0 and output_wav.exists()
     except Exception as e:
         logger.warning(f"Failed to generate ambient audio: {e}")
@@ -111,6 +159,7 @@ def render_slideshow_mp4(
     aspect_ratio: str = "9:16",
     duration_per_image: float = 3.0,
     with_music: bool = True,
+    music_mood: str = "cinematic",
     scenes_metadata: Optional[List[Dict[str, Any]]] = None,
 ) -> Tuple[bool, str]:
     """Render a high-definition MP4 from photos with pan/zoom and seamless crossfade transitions."""
@@ -135,7 +184,7 @@ def render_slideshow_mp4(
     temp_audio = None
     if with_music:
         temp_audio = TEMP_DIR / f"ambient_{output_mp4.stem}.wav"
-        generate_ambient_music(temp_audio, total_duration)
+        generate_ambient_music(temp_audio, total_duration, mood=music_mood)
 
     try:
         # Build filter complex
