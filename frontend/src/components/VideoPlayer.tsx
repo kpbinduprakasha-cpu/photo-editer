@@ -1,5 +1,5 @@
-import React from 'react';
-import { Download, CheckCircle2, RotateCcw, Sparkles, ExternalLink } from 'lucide-react';
+import React, { useRef } from 'react';
+import { Download, CheckCircle2, RotateCcw, Sparkles, ExternalLink, Volume2 } from 'lucide-react';
 import type { Job } from '../types';
 import { getFileUrl } from '../api';
 
@@ -9,6 +9,8 @@ interface VideoPlayerProps {
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({ job, onReset }) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
   if (!job.output_video_path && !job.download_url && !job.stream_url) return null;
 
   // Stream URL for inline playback (Content-Disposition: inline + Range support)
@@ -39,6 +41,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ job, onReset }) => {
       : mood === 'aesthetic'
       ? '☕ Warm Lo-Fi Vibes'
       : '🎬 Cinematic Ambient Score';
+
+  const handleTogglePlay = () => {
+    if (videoRef.current) {
+      if (videoRef.current.paused) {
+        videoRef.current.play().catch(() => {});
+      } else {
+        videoRef.current.pause();
+      }
+    }
+  };
 
   return (
     <div className="card-panel border-emerald-500/40 shadow-2xl shadow-emerald-500/10">
@@ -71,8 +83,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ job, onReset }) => {
       </div>
 
       <div className="flex flex-col items-center justify-center p-4 md:p-6 bg-zinc-950/80 rounded-xl border border-zinc-800/80">
-        <div className={`relative rounded-xl overflow-hidden shadow-2xl border border-zinc-700/60 bg-black flex items-center justify-center ${aspectClass}`}>
+        <div
+          onClick={handleTogglePlay}
+          className={`relative rounded-xl overflow-hidden shadow-2xl border border-zinc-700/60 bg-black flex items-center justify-center cursor-pointer ${aspectClass}`}
+        >
           <video
+            ref={videoRef}
             src={streamUrl}
             controls
             autoPlay
@@ -83,6 +99,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ job, onReset }) => {
           >
             Your browser does not support the video tag.
           </video>
+        </div>
+
+        <div className="flex items-center gap-2 mt-3 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium">
+          <Volume2 size={14} className="animate-pulse" />
+          <span>Soundtrack Active: {moodBadge} (Tap video or controls for sound)</span>
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-3 mt-6 w-full">

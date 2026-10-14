@@ -162,7 +162,7 @@ def render_slideshow_mp4(
     music_mood: str = "cinematic",
     scenes_metadata: Optional[List[Dict[str, Any]]] = None,
 ) -> Tuple[bool, str]:
-    """Render a high-definition MP4 from photos with pan/zoom and seamless crossfade transitions."""
+    """Render a high-definition MP4 from photos with pan/zoom and seamless studio-quality audio."""
     if not FFMPEG_BINARY:
         return False, "FFmpeg binary is not configured."
 
@@ -181,50 +181,82 @@ def render_slideshow_mp4(
     total_images = len(image_paths)
     total_duration = total_images * duration_per_image
 
-    temp_audio = None
+    # Audio Asset Directory
+    audio_assets_dir = Path(__file__).resolve().parent.parent / "audio_assets"
+    selected_audio: Optional[Path] = None
+    temp_generated_audio: Optional[Path] = None
+
     if with_music:
-        temp_audio = TEMP_DIR / f"ambient_{output_mp4.stem}.wav"
-        generate_ambient_music(temp_audio, total_duration, mood=music_mood)
+        mood_str = (music_mood or "cinematic").lower()
+        if any(w in mood_str for w in ["wedding", "romantic", "love", "marry", "marriage", "couple", "bride", "groom"]):
+            candidate = audio_assets_dir / "wedding.wav"
+        elif any(w in mood_str for w in ["nature", "scenic", "outdoor", "forest", "mountain", "calm", "relax", "serene", "waterfall"]):
+            candidate = audio_assets_dir / "nature.wav"
+        elif any(w in mood_str for w in ["celebration", "party", "festival", "upbeat", "dance", "fun", "birthday", "sparkler", "confetti"]):
+            candidate = audio_assets_dir / "celebration.wav"
+        else:
+            candidate = audio_assets_dir / "cinematic.wav"
+
+        if candidate.exists() and candidate.stat().st_size > 0:
+            selected_audio = candidate
+            logger.info(f"Using high-fidelity studio track: {candidate.name} (mood: {music_mood})")
+        else:
+            temp_generated_audio = TEMP_DIR / f"ambient_{output_mp4.stem}.wav"
+            if generate_ambient_music(temp_generated_audio, total_duration, mood=music_mood):
+                selected_audio = temp_generated_audio
+                logger.info(f"Synthesized ambient track for mood: {music_mood}")
 
     try:
         # Build filter complex
-        # 1. Scale and pad each input image to fit target resolution cleanly
+        # 1. Scale with full-bleed crop to fill the frame vibrantly (no black bars)
+        # 2. Apply subtle Ken Burns zoom effect
         inputs = []
         filter_parts = []
 
         for i, img_path in enumerate(image_paths):
             inputs.extend(["-loop", "1", "-t", str(duration_per_image), "-i", str(img_path)])
-            # Scale with aspect ratio maintained, pad with dark background
-            # Apply subtle zoom effect
             filter_parts.append(
-                f"[{i}:v]scale={out_w}:{out_h}:force_original_aspect_ratio=decrease,"
-                f"pad={out_w}:{out_h}:(ow-iw)/2:(oh-ih)/2:black,"
+                f"[{i}:v]scale={out_w}:{out_h}:force_original_aspect_ratio=increase,"
+                f"crop={out_w}:{out_h},"
                 f"zoompan=z='min(zoom+0.0015,1.15)':d={int(duration_per_image * fps)}:s={out_w}x{out_h}:fps={fps},"
                 f"setsar=1[v{i}];"
             )
 
         # Concatenate scenes
         concat_inputs = "".join(f"[v{i}]" for i in range(total_images))
-        filter_parts.append(f"{concat_inputs}concat=n={total_images}:v=1:a=0[vout]")
+        filter_parts.append(f"{concat_inputs}concat=n={total_images}:v=1:a=0[vout];")
+
+        # Audio filter with smooth fade in and fade out
+        if selected_audio and selected_audio.exists():
+            fade_out_start = max(0.1, total_duration - 1.5)
+            filter_parts.append(
+                f"[{total_images}:a]afade=t=in:ss=0:d=1.0,afade=t=out:st={fade_out_start}:d=1.5,volume=0.9[aout]"
+            )
 
         filter_complex = "".join(filter_parts)
 
         cmd = [FFMPEG_BINARY, "-y"]
         cmd.extend(inputs)
 
-        if temp_audio and temp_audio.exists():
-            cmd.extend(["-i", str(temp_audio)])
+        if selected_audio and selected_audio.exists():
+            cmd.extend(["-stream_loop", "-1", "-i", str(selected_audio)])
 
         cmd.extend([
             "-filter_complex", filter_complex,
             "-map", "[vout]",
         ])
 
-        if temp_audio and temp_audio.exists():
-            cmd.extend(["-map", f"{total_images}:a", "-c:a", "aac", "-b:a", "192k"])
+        if selected_audio and selected_audio.exists():
+            cmd.extend([
+                "-map", "[aout]",
+                "-c:a", "aac",
+                "-b:a", "192k",
+                "-ac", "2",
+            ])
 
         cmd.extend([
             "-c:v", "libx264",
+            "-preset", "veryfast",
             "-pix_fmt", "yuv420p",
             "-r", str(fps),
             "-movflags", "+faststart",
@@ -256,8 +288,8 @@ def render_slideshow_mp4(
     except Exception as e:
         return False, f"Unexpected error during render: {str(e)}"
     finally:
-        if temp_audio and temp_audio.exists():
+        if temp_generated_audio and temp_generated_audio.exists():
             try:
-                temp_audio.unlink()
+                temp_generated_audio.unlink()
             except Exception:
                 pass

@@ -42,66 +42,46 @@ async def run_renderer(state: VideoGenerationState) -> Dict[str, Any]:
     output_filename = f"reel_{job_id}.mp4"
     output_mp4_path = OUTPUT_DIR / output_filename
 
-    # Extract scene image paths
+    # Extract scene image paths with robust fallback to state images
     scenes = script.get("scenes", [])
-    image_paths: List[Path] = [Path(sc["imagePath"]) for sc in scenes if "imagePath" in sc]
+    image_paths: List[Path] = [Path(sc["imagePath"]) for sc in scenes if "imagePath" in sc and Path(sc["imagePath"]).exists()]
+    if not image_paths:
+        raw_images = state.get("images", [])
+        image_paths = [Path(img["file_path"]) for img in raw_images if "file_path" in img and Path(img["file_path"]).exists()]
+
+    if not image_paths:
+        err = "Renderer aborted: No valid, readable photo files found on disk for this job."
+        add_job_log(job_id, "Renderer", err, "error")
+        update_job(job_id, status="failed", error_message=err, current_agent="Renderer (Missing Photos)")
+        return {
+            "render_success": False,
+            "error_message": err,
+            "current_agent": "Renderer (Missing Photos)",
+        }
 
     # Calculate average duration per scene
     total_frames = script.get("duration_in_frames", 450)
     fps = script.get("fps", 30)
     total_duration_sec = total_frames / max(1, fps)
-    duration_per_image = total_duration_sec / max(1, len(image_paths))
+    duration_per_image = max(1.5, total_duration_sec / max(1, len(image_paths)))
 
     rendered_ok = False
-    render_method = "Remotion CLI"
+    render_method = "Native FFmpeg Compositor"
+    storyboard = state.get("storyboard") or {}
+    music_mood = storyboard.get("background_music_mood") or state.get("style") or "cinematic"
 
-    # Attempt Remotion render if render script exists
-    remotion_render_script = REMOTION_DIR / "render.js"
-    job_props_file = TEMP_DIR / job_id / "composition_props.json"
+    # Production primary engine: Native FFmpeg Compositor
+    # Directly reads photos from disk (no browser sandboxing), scales to full bleed,
+    # adds Ken Burns zoompan, and mixes studio-quality AAC audio matching the mood.
+    use_remotion_explicit = os.getenv("USE_REMOTION", "0") == "1"
 
-    if remotion_render_script.exists() and job_props_file.exists():
-        add_job_log(job_id, "Renderer", "Executing Remotion React compositor...", "info")
-        try:
-            cmd = [
-                "node",
-                str(remotion_render_script),
-                "--props", str(job_props_file),
-                "--output", str(output_mp4_path),
-            ]
-            res = subprocess.run(
-                cmd,
-                cwd=str(REMOTION_DIR),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=RENDER_TIMEOUT_SECONDS,
-            )
-            if res.returncode == 0 and output_mp4_path.exists() and output_mp4_path.stat().st_size > 0:
-                rendered_ok = True
-                add_job_log(job_id, "Renderer", "Remotion composition rendered successfully.", "info")
-            else:
-                add_job_log(
-                    job_id,
-                    "Renderer",
-                    f"Remotion CLI note: falling back to high-performance FFmpeg compositor. ({res.stderr[:200] if res.stderr else 'code ' + str(res.returncode)})",
-                    "info",
-                )
-        except Exception as e:
-            add_job_log(
-                job_id,
-                "Renderer",
-                f"Remotion process note: switching to native FFmpeg renderer: {str(e)}",
-                "info",
-            )
-
-    # If Remotion didn't render (or wasn't configured), use the native FFmpeg slideshow renderer
-    if not rendered_ok:
-        render_method = "Native FFmpeg Compositor"
-        storyboard = state.get("storyboard") or {}
-        music_mood = storyboard.get("background_music_mood", "cinematic")
-        add_job_log(job_id, "Renderer", f"Rendering with {render_method} (Audio mood: {music_mood})...", "info")
+    if not use_remotion_explicit:
+        add_job_log(
+            job_id,
+            "Renderer",
+            f"Rendering HD video with {render_method} (Theme/Audio: '{music_mood}', Photos: {len(image_paths)}, Ratio: {aspect_ratio})...",
+            "info",
+        )
         success, msg = render_slideshow_mp4(
             image_paths=image_paths,
             output_mp4=output_mp4_path,
@@ -111,16 +91,51 @@ async def run_renderer(state: VideoGenerationState) -> Dict[str, Any]:
             music_mood=music_mood,
             scenes_metadata=scenes,
         )
-        if not success:
-            err = f"Rendering engine failed: {msg}"
-            add_job_log(job_id, "Renderer", err, "error")
-            update_job(job_id, status="failed", error_message=err, current_agent="Renderer (Failed)")
-            return {
-                "render_success": False,
-                "error_message": err,
-                "current_agent": "Renderer (Failed)",
-            }
-        rendered_ok = True
+        if success and output_mp4_path.exists() and output_mp4_path.stat().st_size > 0:
+            rendered_ok = True
+            add_job_log(job_id, "Renderer", f"Native FFmpeg Compositor created video reel successfully in {(duration_per_image * len(image_paths)):.1f}s.", "info")
+        else:
+            add_job_log(job_id, "Renderer", f"Native FFmpeg render note: {msg}", "warning")
+
+    # Optional fallback to Remotion if explicitly requested or if native failed
+    if not rendered_ok:
+        remotion_render_script = REMOTION_DIR / "render.js"
+        job_props_file = TEMP_DIR / job_id / "composition_props.json"
+        if remotion_render_script.exists() and job_props_file.exists():
+            render_method = "Remotion CLI"
+            add_job_log(job_id, "Renderer", "Attempting Remotion React compositor...", "info")
+            try:
+                cmd = [
+                    "node",
+                    str(remotion_render_script),
+                    "--props", str(job_props_file),
+                    "--output", str(output_mp4_path),
+                ]
+                res = subprocess.run(
+                    cmd,
+                    cwd=str(REMOTION_DIR),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=RENDER_TIMEOUT_SECONDS,
+                )
+                if res.returncode == 0 and output_mp4_path.exists() and output_mp4_path.stat().st_size > 0:
+                    rendered_ok = True
+                    add_job_log(job_id, "Renderer", "Remotion composition rendered successfully.", "info")
+            except Exception as e:
+                add_job_log(job_id, "Renderer", f"Remotion render error: {str(e)}", "error")
+
+    if not rendered_ok:
+        err = "All rendering engines failed to produce a valid MP4 file."
+        add_job_log(job_id, "Renderer", err, "error")
+        update_job(job_id, status="failed", error_message=err, current_agent="Renderer (Failed)")
+        return {
+            "render_success": False,
+            "error_message": err,
+            "current_agent": "Renderer (Failed)",
+        }
 
     # Validate output playability via FFprobe
     add_job_log(job_id, "Renderer", "Validating output MP4 integrity and stream playability via FFprobe...", "info")
