@@ -111,3 +111,43 @@ export interface LogEntry {
   message: string;
   timestamp: string;
 }
+
+export interface VideoTemplate {
+  id: string;
+  title: string;
+  category: string;
+  description: string;
+  duration_seconds: number;
+  aspect_ratio: string;
+  music_mood: string;
+  filter_effect: string;
+  scene_count: number;
+  scenes_blueprint?: {
+    label: string;
+    effect: string;
+    duration: number;
+    caption: string;
+  }[];
+}
+
+export interface AudioTrack {
+  id: string;
+  title: string;
+  category: string;
+  genre: string;
+  mood: string;
+  filename: string;
+  description: string;
+  bpm: number;
+  license: string;
+  preview_url: string;
+}
+
+export interface ExportSettings {
+  resolution: '1080p' | '720p';
+  fps: 24 | 30 | 60;
+  aspect_ratio?: string;
+  music_mood?: string;
+  custom_audio_path?: string;
+  audio_volume: number;
+}

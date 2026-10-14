@@ -6,6 +6,9 @@ import type {
   LogEntry,
   ModelStatus,
   SamplePack,
+  VideoTemplate,
+  StoryboardScene,
+  ExportSettings,
 } from './types';
 import {
   fetchHealth,
@@ -19,10 +22,17 @@ import {
   retryJob,
   fetchJob,
   fetchJobLogs,
+  fetchJobImages,
   deleteJob,
+  updateJobStoryboard,
+  directRenderJob,
 } from './api';
 import { Header } from './components/Header';
 import { SamplePacks } from './components/SamplePacks';
+import { TemplatesSelector } from './components/TemplatesSelector';
+import { AudioSelector } from './components/AudioSelector';
+import { TimelineEditor } from './components/TimelineEditor';
+import { ExportModal } from './components/ExportModal';
 import { UploadZone } from './components/UploadZone';
 import { PromptControls } from './components/PromptControls';
 import { AgentTimeline } from './components/AgentTimeline';
@@ -31,7 +41,7 @@ import { VideoPlayer } from './components/VideoPlayer';
 import { LogsConsole } from './components/LogsConsole';
 import { JobHistory } from './components/JobHistory';
 import { OllamaModal } from './components/OllamaModal';
-import { CheckCircle2, AlertCircle, X } from 'lucide-react';
+import { CheckCircle2, AlertCircle, X, Sparkles, LayoutTemplate, Music, Film } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [health, setHealth] = useState<HealthStatus | null>(null);
@@ -42,13 +52,17 @@ export const App: React.FC = () => {
   const [uploadedImages, setUploadedImages] = useState<ImageItem[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
 
+  // Studio Showcase Tabs: Templates | Quick Samples | Audio Studio
+  const [activeStudioTab, setActiveStudioTab] = useState<'templates' | 'samples' | 'audio'>('templates');
+
   // Generation Form Parameters
-  const [prompt, setPrompt] = useState('💒 Romantic wedding celebration with elegant titles & gentle transitions');
+  const [prompt, setPrompt] = useState('🔥 High-energy trending reel with dynamic zoom-ins, punchy beats & viral transitions');
   const [aspectRatio, setAspectRatio] = useState('9:16');
-  const [style, setStyle] = useState('wedding');
+  const [style, setStyle] = useState('trending');
   const [duration, setDuration] = useState(15);
   const [musicEnabled, setMusicEnabled] = useState(true);
   const [captionsEnabled, setCaptionsEnabled] = useState(true);
+  const [audioVolume, setAudioVolume] = useState(1.0);
 
   // Loading States
   const [isUploading, setIsUploading] = useState(false);
@@ -56,6 +70,7 @@ export const App: React.FC = () => {
   const [isRetrying, setIsRetrying] = useState(false);
   const [isLoadingPack, setIsLoadingPack] = useState(false);
   const [activePackId, setActivePackId] = useState<string | undefined>('wedding');
+  const [isDirectRendering, setIsDirectRendering] = useState(false);
 
   // Notification Toast
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -63,6 +78,7 @@ export const App: React.FC = () => {
   // Modals
   const [isOllamaModalOpen, setIsOllamaModalOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   // Polling ref
   const pollTimerRef = useRef<number | null>(null);
@@ -164,6 +180,26 @@ export const App: React.FC = () => {
     };
   }, [currentJob?.status, currentJob?.id]);
 
+  // Handle Template Applied (Module 8)
+  const handleTemplateApplied = async (jobId: string, template: VideoTemplate) => {
+    try {
+      const updated = await fetchJob(jobId);
+      setCurrentJob(updated);
+      setPrompt(template.description || template.title);
+      setAspectRatio(template.aspect_ratio);
+      setStyle(template.music_mood);
+      setDuration(template.duration_seconds);
+
+      const imgs = await fetchJobImages(jobId).catch(() => []);
+      if (imgs.length > 0) {
+        setUploadedImages(imgs);
+      }
+      showToast(`🎬 Applied template "${template.title}" with ${template.scene_count} custom scenes!`, 'success');
+    } catch (err: any) {
+      showToast(`Failed to load applied template job: ${err.message}`, 'error');
+    }
+  };
+
   // Handle Sample Pack Selection
   const handleSelectSamplePack = async (pack: SamplePack) => {
     setIsLoadingPack(true);
@@ -229,7 +265,7 @@ export const App: React.FC = () => {
   // Handle Start Generation
   const handleGenerate = async () => {
     if (uploadedImages.length === 0 || isUploading) {
-      showToast('Please upload photos or choose a sample reel first.', 'info');
+      showToast('Please upload photos or choose a template/sample reel first.', 'info');
       return;
     }
 
@@ -260,6 +296,63 @@ export const App: React.FC = () => {
     }
   };
 
+  // Handle Storyboard Timeline Scenes Update (Module 9, 10)
+  const handleUpdateScenes = async (newScenes: StoryboardScene[]) => {
+    if (!currentJob || !currentJob.storyboard) return;
+    const updatedStoryboard = {
+      ...currentJob.storyboard,
+      scenes: newScenes,
+    };
+    setCurrentJob((prev) => (prev ? { ...prev, storyboard: updatedStoryboard } : prev));
+    try {
+      await updateJobStoryboard(currentJob.id, updatedStoryboard);
+      showToast('Timeline scenes updated! Click "Apply & Re-render" to update the video.', 'info');
+    } catch (err: any) {
+      showToast(`Failed to update timeline: ${err.message}`, 'error');
+    }
+  };
+
+  // Handle Direct Re-render from Timeline Editor
+  const handleTriggerTimelineRender = async () => {
+    if (!currentJob) return;
+    setIsDirectRendering(true);
+    try {
+      showToast('🎬 Rendering updated video with your timeline edits...', 'info');
+      await directRenderJob(currentJob.id, {
+        resolution: '1080p',
+        aspect_ratio: currentJob.aspect_ratio || aspectRatio,
+        fps: 30,
+        music_mood: currentJob.storyboard?.background_music_mood || style,
+        audio_volume: audioVolume,
+      });
+      const updated = await fetchJob(currentJob.id);
+      setCurrentJob(updated);
+      setIsGenerating(true);
+    } catch (err: any) {
+      showToast(`Render failed: ${err.message}`, 'error');
+    } finally {
+      setIsDirectRendering(false);
+    }
+  };
+
+  // Handle Confirm Custom Export (Module 12)
+  const handleConfirmExport = async (settings: ExportSettings) => {
+    if (!currentJob) return;
+    setIsExportModalOpen(false);
+    setIsDirectRendering(true);
+    showToast(`🎬 Exporting ${settings.resolution} @ ${settings.fps} FPS...`, 'info');
+    try {
+      await directRenderJob(currentJob.id, settings);
+      const updated = await fetchJob(currentJob.id);
+      setCurrentJob(updated);
+      setIsGenerating(true);
+    } catch (err: any) {
+      showToast(`Export failed: ${err.message}`, 'error');
+    } finally {
+      setIsDirectRendering(false);
+    }
+  };
+
   // Handle Retry
   const handleRetry = async () => {
     if (!currentJob) return;
@@ -287,9 +380,14 @@ export const App: React.FC = () => {
   // Select Past Job
   const handleSelectJob = async (jobId: string) => {
     try {
-      const [j, l] = await Promise.all([fetchJob(jobId), fetchJobLogs(jobId)]);
+      const [j, l, imgs] = await Promise.all([
+        fetchJob(jobId),
+        fetchJobLogs(jobId),
+        fetchJobImages(jobId).catch(() => []),
+      ]);
       setCurrentJob(j);
       setLogs(l);
+      setUploadedImages(imgs);
       setPrompt(j.prompt);
       setAspectRatio(j.aspect_ratio);
       setStyle(j.style);
@@ -356,14 +454,82 @@ export const App: React.FC = () => {
       )}
 
       <main className="main-layout flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
-        {/* Sample Packs 1-Click Showcase */}
-        <SamplePacks
-          packs={samplePacks}
-          onSelectPack={handleSelectSamplePack}
-          isLoading={isLoadingPack}
-          activePackId={activePackId}
-          disabled={isGenerating || isUploading}
-        />
+        {/* Studio Navigation Tabs (Templates, Samples, Audio) */}
+        <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveStudioTab('templates')}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all ${
+                activeStudioTab === 'templates'
+                  ? 'bg-primary-500/20 text-primary-300 border border-primary-500/40 shadow-sm'
+                  : 'bg-zinc-900/60 text-zinc-400 hover:text-zinc-200 border border-transparent'
+              }`}
+            >
+              <LayoutTemplate size={16} />
+              <span>Director Templates (Module 8)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveStudioTab('samples')}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all ${
+                activeStudioTab === 'samples'
+                  ? 'bg-orange-500/20 text-orange-300 border border-orange-500/40 shadow-sm'
+                  : 'bg-zinc-900/60 text-zinc-400 hover:text-zinc-200 border border-transparent'
+              }`}
+            >
+              <Sparkles size={16} />
+              <span>1-Click Sample Reels</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveStudioTab('audio')}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all ${
+                activeStudioTab === 'audio'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                  : 'bg-zinc-900/60 text-zinc-400 hover:text-zinc-200 border border-transparent'
+              }`}
+            >
+              <Music size={16} />
+              <span>Soundtrack Studio (Module 5)</span>
+            </button>
+          </div>
+
+          <div className="hidden sm:flex items-center gap-2 text-xs text-zinc-500">
+            <Film size={14} className="text-primary-400" />
+            <span>AI Reel Director</span>
+          </div>
+        </div>
+
+        {/* Studio Active Tab Content */}
+        {activeStudioTab === 'templates' && (
+          <TemplatesSelector
+            currentJobId={currentJob?.id}
+            onTemplateApplied={handleTemplateApplied}
+          />
+        )}
+
+        {activeStudioTab === 'samples' && (
+          <SamplePacks
+            packs={samplePacks}
+            onSelectPack={handleSelectSamplePack}
+            isLoading={isLoadingPack}
+            activePackId={activePackId}
+            disabled={isGenerating || isUploading}
+          />
+        )}
+
+        {activeStudioTab === 'audio' && (
+          <AudioSelector
+            selectedMood={style}
+            onSelectMood={(m) => setStyle(m)}
+            volume={audioVolume}
+            onVolumeChange={setAudioVolume}
+            jobId={currentJob?.id}
+          />
+        )}
 
         {/* Top Control Grid: Upload + Prompt Controls */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -411,7 +577,22 @@ export const App: React.FC = () => {
 
         {/* Generated Video Player (Rendered MP4) */}
         {currentJob?.status === 'completed' && (
-          <VideoPlayer job={currentJob} onReset={handleReset} />
+          <VideoPlayer
+            job={currentJob}
+            onReset={handleReset}
+            onOpenExport={() => setIsExportModalOpen(true)}
+          />
+        )}
+
+        {/* Interactive Multi-Track Timeline & Clip Editor (Module 9 & 10) */}
+        {currentJob?.storyboard?.scenes && currentJob.storyboard.scenes.length > 0 && (
+          <TimelineEditor
+            scenes={currentJob.storyboard.scenes}
+            images={uploadedImages}
+            onUpdateScenes={handleUpdateScenes}
+            onTriggerRender={handleTriggerTimelineRender}
+            rendering={isDirectRendering || isGenerating}
+          />
         )}
 
         {/* Storyboard Viewer */}
@@ -440,6 +621,15 @@ export const App: React.FC = () => {
         onClose={() => setIsOllamaModalOpen(false)}
         models={models}
         onRefresh={loadHealthAndModels}
+      />
+
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        onConfirmExport={handleConfirmExport}
+        exporting={isDirectRendering}
+        defaultAspectRatio={currentJob?.aspect_ratio || aspectRatio}
+        defaultMusicMood={currentJob?.storyboard?.background_music_mood || style}
       />
     </div>
   );

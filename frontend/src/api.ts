@@ -1,4 +1,14 @@
-import type { HealthStatus, Job, ImageItem, LogEntry, ModelStatus, SamplePack } from './types';
+import type {
+  HealthStatus,
+  Job,
+  ImageItem,
+  LogEntry,
+  ModelStatus,
+  SamplePack,
+  VideoTemplate,
+  AudioTrack,
+  ExportSettings,
+} from './types';
 
 const API_BASE =
   typeof window !== 'undefined' && window.location.port !== '5173'
@@ -202,6 +212,71 @@ export async function fetchAllJobs(): Promise<Job[]> {
 export async function deleteJob(jobId: string): Promise<void> {
   const res = await fetch(`${API_BASE}/api/jobs/${jobId}`, { method: 'DELETE' });
   if (!res.ok) throw new Error(await extractError(res, 'Failed to delete job'));
+}
+
+export async function fetchTemplates(): Promise<VideoTemplate[]> {
+  const res = await fetch(`${API_BASE}/api/templates`);
+  if (!res.ok) throw new Error(await extractError(res, 'Failed to fetch templates'));
+  return res.json();
+}
+
+export async function applyTemplate(
+  templateId: string,
+  jobId?: string,
+  prompt?: string
+): Promise<{ message: string; job_id: string; template: VideoTemplate }> {
+  const res = await fetch(`${API_BASE}/api/templates/${encodeURIComponent(templateId)}/apply`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ job_id: jobId, prompt }),
+  });
+  if (!res.ok) throw new Error(await extractError(res, 'Failed to apply template'));
+  return res.json();
+}
+
+export async function fetchAudioCatalog(): Promise<AudioTrack[]> {
+  const res = await fetch(`${API_BASE}/api/audio/catalog`);
+  if (!res.ok) throw new Error(await extractError(res, 'Failed to load audio catalog'));
+  return res.json();
+}
+
+export async function uploadCustomAudio(
+  file: File,
+  jobId?: string
+): Promise<{ filename: string; preview_url: string; file_path: string }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  if (jobId) formData.append('job_id', jobId);
+
+  const res = await fetch(`${API_BASE}/api/audio/upload`, {
+    method: 'POST',
+    body: formData,
+  });
+  if (!res.ok) throw new Error(await extractError(res, 'Failed to upload custom audio'));
+  return res.json();
+}
+
+export async function updateJobStoryboard(
+  jobId: string,
+  storyboard: { title?: string; background_music_mood?: string; scenes: any[] }
+): Promise<any> {
+  const res = await fetch(`${API_BASE}/api/jobs/${jobId}/storyboard`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(storyboard),
+  });
+  if (!res.ok) throw new Error(await extractError(res, 'Failed to update timeline'));
+  return res.json();
+}
+
+export async function directRenderJob(jobId: string, settings: ExportSettings): Promise<any> {
+  const res = await fetch(`${API_BASE}/api/jobs/${jobId}/render`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings),
+  });
+  if (!res.ok) throw new Error(await extractError(res, 'Failed to render video'));
+  return res.json();
 }
 
 export function getFileUrl(relativePath: string): string {

@@ -1,0 +1,165 @@
+"""Video Templates Service for FotoOwl (Module 8)."""
+
+from typing import Any, Dict, List, Optional
+
+TEMPLATES_CATALOG: List[Dict[str, Any]] = [
+    {
+        "id": "nature-landscape",
+        "title": "🌲 Nature & Scenic Landscape (45s Director's Cut)",
+        "category": "nature",
+        "description": "Epic 9-scene nature adventure with cloud motion, water flow, sweeping pans, and pastoral folk harmony.",
+        "duration_seconds": 45,
+        "aspect_ratio": "9:16",
+        "music_mood": "nature",
+        "filter_effect": "vibrant",
+        "scene_count": 9,
+        "scenes_blueprint": [
+            {"label": "Sunrise Mountains", "effect": "zoom_in", "duration": 5.0, "caption": "Golden sunrise kissing mountain peaks"},
+            {"label": "Majestic Waterfall", "effect": "pan_right", "duration": 5.0, "caption": "Cascading waters carving ancient stone"},
+            {"label": "Mountain Lake", "effect": "zoom_in", "duration": 5.0, "caption": "Crystal mirror beneath the morning sky"},
+            {"label": "Wildlife & Flight", "effect": "zoom_out", "duration": 5.0, "caption": "Wild spirits roaming untouched realms"},
+            {"label": "Ocean Sunset", "effect": "tilt_up", "duration": 5.0, "caption": "Where crimson twilight meets the tide"},
+            {"label": "Green Valley", "effect": "tilt_down", "duration": 5.0, "caption": "Rolling emerald meadows breathing life"},
+            {"label": "Forest Mountains", "effect": "pan_left", "duration": 5.0, "caption": "Ancient pines whispering in the mist"},
+            {"label": "Flowing Stream", "effect": "zoom_out", "duration": 5.0, "caption": "Gentle currents weaving through the wild"},
+            {"label": "Sunset Horizon", "effect": "zoom_in", "duration": 5.0, "caption": "Until dawn awakens our next adventure"},
+        ],
+    },
+    {
+        "id": "wedding-anniversary",
+        "title": "💒 Wedding & Anniversary Romance",
+        "category": "wedding",
+        "description": "Timeless romantic ballad with emotional harp, acoustic piano, warm golden tones, and tender transitions.",
+        "duration_seconds": 15,
+        "aspect_ratio": "9:16",
+        "music_mood": "wedding",
+        "filter_effect": "warm",
+        "scene_count": 5,
+        "scenes_blueprint": [
+            {"label": "The Vows", "effect": "zoom_in", "duration": 3.0, "caption": "Two souls, one sacred promise"},
+            {"label": "Golden Rings", "effect": "pan_right", "duration": 3.0, "caption": "A bond woven into eternity"},
+            {"label": "The Celebration", "effect": "zoom_in", "duration": 3.0, "caption": "Surrounded by everyone we love"},
+            {"label": "First Dance", "effect": "tilt_up", "duration": 3.0, "caption": "Dancing under a canopy of starlight"},
+            {"label": "Forever Starts Now", "effect": "zoom_out", "duration": 3.0, "caption": "Our happily ever after begins today"},
+        ],
+    },
+    {
+        "id": "social-reels",
+        "title": "💥 Viral Instagram Reel & TikTok Beat",
+        "category": "social",
+        "description": "High-retention 128 BPM viral beat drop with 808 sub-bass, punchy punch-ins, and vibrant color grade.",
+        "duration_seconds": 15,
+        "aspect_ratio": "9:16",
+        "music_mood": "trending",
+        "filter_effect": "vibrant",
+        "scene_count": 6,
+        "scenes_blueprint": [
+            {"label": "Hook Frame", "effect": "zoom_in", "duration": 2.5, "caption": "Stop scrolling: you won't believe this"},
+            {"label": "Beat Drop 1", "effect": "pan_left", "duration": 2.5, "caption": "Pure electric energy"},
+            {"label": "Action Shot", "effect": "zoom_out", "duration": 2.5, "caption": "Living life in full velocity"},
+            {"label": "Beat Drop 2", "effect": "pan_right", "duration": 2.5, "caption": "Unmatched vibes only"},
+            {"label": "Golden Moment", "effect": "tilt_up", "duration": 2.5, "caption": "Memories that stay forever"},
+            {"label": "Outro CTA", "effect": "zoom_in", "duration": 2.5, "caption": "Save this reel & tag a friend"},
+        ],
+    },
+    {
+        "id": "birthday-celebration",
+        "title": "🎉 Birthday & Festive Party",
+        "category": "celebration",
+        "description": "Upbeat 124 BPM party groove, festive claps, lively brass, and joyful confetti energy.",
+        "duration_seconds": 15,
+        "aspect_ratio": "9:16",
+        "music_mood": "celebration",
+        "filter_effect": "vibrant",
+        "scene_count": 5,
+        "scenes_blueprint": [
+            {"label": "The Countdown", "effect": "zoom_in", "duration": 3.0, "caption": "Another year bolder and brighter"},
+            {"label": "Cake & Candles", "effect": "zoom_out", "duration": 3.0, "caption": "Make a wish that lights the world"},
+            {"label": "Laughter & Cheers", "effect": "pan_right", "duration": 3.0, "caption": "With the people who make life special"},
+            {"label": "Party Anthem", "effect": "tilt_up", "duration": 3.0, "caption": "Music high, spirits higher"},
+            {"label": "Cheers to Tonight", "effect": "zoom_in", "duration": 3.0, "caption": "Here's to unforgettable memories"},
+        ],
+    },
+    {
+        "id": "travel-adventure",
+        "title": "✈️ Travel & Wanderlust Odyssey",
+        "category": "travel",
+        "description": "Sweeping panoramic movements, cinematic color balance, and uplifting adventure melodies.",
+        "duration_seconds": 18,
+        "aspect_ratio": "9:16",
+        "music_mood": "nature",
+        "filter_effect": "cinematic",
+        "scene_count": 6,
+        "scenes_blueprint": [
+            {"label": "Departure", "effect": "zoom_in", "duration": 3.0, "caption": "Passport stamped, compass set"},
+            {"label": "Hidden Pathways", "effect": "pan_left", "duration": 3.0, "caption": "Finding magic off the beaten path"},
+            {"label": "City Lights", "effect": "zoom_out", "duration": 3.0, "caption": "Vibrant streets glowing at twilight"},
+            {"label": "Mountain Vista", "effect": "tilt_up", "duration": 3.0, "caption": "Breathing in the mountain air"},
+            {"label": "Coastal Sunset", "effect": "pan_right", "duration": 3.0, "caption": "Where the shoreline kisses the horizon"},
+            {"label": "Next Destination", "effect": "zoom_in", "duration": 3.0, "caption": "The journey never truly ends"},
+        ],
+    },
+    {
+        "id": "family-portrait",
+        "title": "👨‍👩‍👧‍👦 Family Moments & Heritage",
+        "category": "portrait",
+        "description": "Warm, nostalgic color grading, gentle subtle zooms, and heartwarming acoustic harmonies.",
+        "duration_seconds": 15,
+        "aspect_ratio": "9:16",
+        "music_mood": "wedding",
+        "filter_effect": "vintage",
+        "scene_count": 5,
+        "scenes_blueprint": [
+            {"label": "Generations", "effect": "zoom_in", "duration": 3.0, "caption": "Roots that run deep and strong"},
+            {"label": "Shared Smiles", "effect": "pan_left", "duration": 3.0, "caption": "The laughter that warms any home"},
+            {"label": "Growing Up", "effect": "zoom_out", "duration": 3.0, "caption": "Cherishing moments before they become memories"},
+            {"label": "Golden Afternoon", "effect": "tilt_up", "duration": 3.0, "caption": "Sunshine and shared hugs"},
+            {"label": "Always Together", "effect": "zoom_in", "duration": 3.0, "caption": "Family: our anchor and our wings"},
+        ],
+    },
+    {
+        "id": "cinematic-montage",
+        "title": "🎬 Cinematic Widescreen Montage",
+        "category": "cinematic",
+        "description": "16:9 widescreen landscape with film contrast, subtle vignette, and epic orchestral crescendo.",
+        "duration_seconds": 20,
+        "aspect_ratio": "16:9",
+        "music_mood": "cinematic",
+        "filter_effect": "cinematic",
+        "scene_count": 5,
+        "scenes_blueprint": [
+            {"label": "Prologue", "effect": "zoom_in", "duration": 4.0, "caption": "Every story begins in silence"},
+            {"label": "Rising Tide", "effect": "pan_left", "duration": 4.0, "caption": "Light breaking through the clouds"},
+            {"label": "Turning Point", "effect": "tilt_up", "duration": 4.0, "caption": "A moment frozen in time"},
+            {"label": "Climax", "effect": "pan_right", "duration": 4.0, "caption": "The beauty of what once was"},
+            {"label": "Epilogue", "effect": "zoom_out", "duration": 4.0, "caption": "And what is yet to come"},
+        ],
+    },
+    {
+        "id": "product-advertisement",
+        "title": "🛍️ Product Showcase & E-Commerce Ad",
+        "category": "advertisement",
+        "description": "1:1 square Instagram feed format with vibrant punch, clear headline text, and modern lo-fi groove.",
+        "duration_seconds": 12,
+        "aspect_ratio": "1:1",
+        "music_mood": "lofi",
+        "filter_effect": "vibrant",
+        "scene_count": 4,
+        "scenes_blueprint": [
+            {"label": "Product Hero", "effect": "zoom_in", "duration": 3.0, "caption": "Crafted with relentless attention to detail"},
+            {"label": "Feature Highlight", "effect": "pan_right", "duration": 3.0, "caption": "Engineered for pure performance"},
+            {"label": "Lifestyle Context", "effect": "tilt_up", "duration": 3.0, "caption": "Fits effortlessly into your everyday flow"},
+            {"label": "Shop Now CTA", "effect": "zoom_out", "duration": 3.0, "caption": "Available now. Tap to claim yours."},
+        ],
+    },
+]
+
+
+def list_templates() -> List[Dict[str, Any]]:
+    """Return all available templates."""
+    return TEMPLATES_CATALOG
+
+
+def get_template_by_id(template_id: str) -> Optional[Dict[str, Any]]:
+    """Retrieve template definition by ID."""
+    return next((t for t in TEMPLATES_CATALOG if t["id"] == template_id), None)

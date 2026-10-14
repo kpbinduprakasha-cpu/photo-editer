@@ -128,6 +128,7 @@ export const PromptControls: React.FC<PromptControlsProps> = ({
               onChange={(e) => setStyle(e.target.value)}
               disabled={isGenerating || isUploading}
             >
+              <option value="trending">🔥 Trending Instagram / TikTok (128 BPM Beat Drop)</option>
               <option value="cinematic">🎬 Cinematic Film Grade (Smooth & Emotional)</option>
               <option value="wedding">💒 Wedding & Romance (Harp & Sweet Chimes)</option>
               <option value="nature">🌲 Serene Nature (Acoustic Pastoral)</option>

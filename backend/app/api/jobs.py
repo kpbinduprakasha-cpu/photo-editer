@@ -1,12 +1,13 @@
-"""Jobs API router for lifecycle management, execution, polling, and downloads."""
-
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
+from app.config import OUTPUT_DIR
 from app.database import (
+    add_job_log,
     create_job,
     delete_job,
     get_job,
@@ -16,10 +17,26 @@ from app.database import (
     update_job,
 )
 from app.schemas import JobCreateRequest, JobResponse, LogEntry
+from app.services.ffmpeg_service import probe_video, render_slideshow_mp4
 from app.services.storage import delete_job_files
 from app.workers.job_runner import run_job_in_background
 
 router = APIRouter(prefix="/api/jobs", tags=["Jobs"])
+
+
+class StoryboardUpdateRequest(BaseModel):
+    title: Optional[str] = None
+    background_music_mood: Optional[str] = None
+    scenes: List[Dict[str, Any]]
+
+
+class CustomRenderRequest(BaseModel):
+    resolution: str = "1080p"
+    fps: int = 30
+    aspect_ratio: Optional[str] = None
+    music_mood: Optional[str] = None
+    custom_audio_path: Optional[str] = None
+    audio_volume: float = 0.95
 
 
 @router.post("", response_model=JobResponse)
@@ -161,6 +178,120 @@ async def retry_job_pipeline(job_id: str) -> dict:
     run_job_in_background(job_id)
 
     return {"message": "Job retry initiated.", "job_id": job_id}
+
+
+@router.put("/{job_id}/storyboard")
+async def update_job_storyboard(job_id: str, req: StoryboardUpdateRequest) -> dict:
+    """Update job storyboard scenes, durations, motion effects, and text from timeline editor."""
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+
+    existing_sb = job.get("storyboard") or {}
+    new_sb = {
+        **existing_sb,
+        "title": req.title or existing_sb.get("title", "Custom Reel"),
+        "background_music_mood": req.background_music_mood or existing_sb.get("background_music_mood", "trending"),
+        "scenes": req.scenes,
+    }
+
+    # Sum scene durations
+    calc_duration = sum(float(sc.get("duration_seconds", 3.0)) for sc in req.scenes)
+    duration_sec = max(5, int(round(calc_duration)))
+
+    update_job(
+        job_id,
+        storyboard_json=new_sb,
+        duration_seconds=duration_sec,
+    )
+    add_job_log(job_id, "Timeline Editor", f"Timeline updated: {len(req.scenes)} clips, total duration {duration_sec}s.", "info")
+
+    return {"message": "Timeline updated successfully.", "job_id": job_id, "storyboard": new_sb}
+
+
+@router.post("/{job_id}/render")
+async def direct_render_job(job_id: str, req: CustomRenderRequest) -> dict:
+    """Directly render customized timeline with chosen resolution, fps, and music settings."""
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+
+    images = get_job_images(job_id)
+    if not images:
+        raise HTTPException(status_code=400, detail="Cannot render: No images uploaded for this job.")
+
+    storyboard = job.get("storyboard") or {}
+    scenes = storyboard.get("scenes") or []
+
+    # Extract image paths
+    image_lookup = {img["id"]: Path(img["file_path"]) for img in images}
+    image_paths: List[Path] = []
+
+    if scenes:
+        for sc in scenes:
+            img_id = sc.get("image_id")
+            path = image_lookup.get(img_id)
+            if not path or not path.exists():
+                if sc.get("imagePath") and Path(sc["imagePath"]).exists():
+                    path = Path(sc["imagePath"])
+                elif sc.get("file_path") and Path(sc["file_path"]).exists():
+                    path = Path(sc["file_path"])
+                else:
+                    path = Path(images[0]["file_path"])
+            image_paths.append(path)
+    else:
+        image_paths = [Path(img["file_path"]) for img in images if Path(img["file_path"]).exists()]
+
+    aspect_ratio = req.aspect_ratio or job.get("aspect_ratio", "9:16")
+    music_mood = req.music_mood or storyboard.get("background_music_mood") or "trending"
+    output_filename = f"reel_{job_id}.mp4"
+    output_mp4_path = OUTPUT_DIR / output_filename
+
+    update_job(job_id, status="processing", current_agent="Renderer", progress_pct=85)
+    add_job_log(job_id, "Renderer", f"Direct render initiated: {req.resolution} @ {req.fps}fps, music: {music_mood}...", "info")
+
+    custom_audio = Path(req.custom_audio_path) if req.custom_audio_path else None
+
+    success, msg = render_slideshow_mp4(
+        image_paths=image_paths,
+        output_mp4=output_mp4_path,
+        aspect_ratio=aspect_ratio,
+        duration_per_image=float(job.get("duration_seconds", 15)) / max(1, len(image_paths)),
+        with_music=job.get("music_enabled", True),
+        music_mood=music_mood,
+        scenes_metadata=scenes,
+        resolution=req.resolution,
+        fps=req.fps,
+        custom_audio_path=custom_audio,
+        audio_volume=req.audio_volume,
+    )
+
+    if not success or not output_mp4_path.exists() or output_mp4_path.stat().st_size == 0:
+        err = f"Rendering failed: {msg}"
+        update_job(job_id, status="failed", error_message=err, current_agent="Renderer (Failed)")
+        add_job_log(job_id, "Renderer", err, "error")
+        raise HTTPException(status_code=500, detail=err)
+
+    probe = probe_video(output_mp4_path)
+    update_job(
+        job_id,
+        status="completed",
+        current_agent="Completed",
+        progress_pct=100,
+        output_video_path=str(output_mp4_path),
+        error_message=None,
+    )
+    add_job_log(job_id, "Renderer", f"Video reel successfully rendered! Size: {round(output_mp4_path.stat().st_size/(1024*1024), 2)}MB, Duration: {probe.get('duration')}s.", "info")
+
+    return {
+        "status": "completed",
+        "message": "Render completed successfully.",
+        "job_id": job_id,
+        "output_video_path": str(output_mp4_path),
+        "stream_url": f"/api/jobs/{job_id}/stream",
+        "download_url": f"/api/jobs/{job_id}/download",
+        "duration": probe.get("duration"),
+    }
 
 
 @router.get("/{job_id}/logs", response_model=List[LogEntry])

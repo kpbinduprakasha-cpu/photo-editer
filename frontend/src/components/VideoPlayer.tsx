@@ -1,14 +1,15 @@
 import React, { useRef } from 'react';
-import { Download, CheckCircle2, RotateCcw, Sparkles, ExternalLink, Volume2 } from 'lucide-react';
+import { Download, CheckCircle2, RotateCcw, Sparkles, ExternalLink, Volume2, Sliders } from 'lucide-react';
 import type { Job } from '../types';
 import { getFileUrl } from '../api';
 
 interface VideoPlayerProps {
   job: Job;
   onReset: () => void;
+  onOpenExport?: () => void;
 }
 
-export const VideoPlayer: React.FC<VideoPlayerProps> = ({ job, onReset }) => {
+export const VideoPlayer: React.FC<VideoPlayerProps> = ({ job, onReset, onOpenExport }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   if (!job.output_video_path && !job.download_url && !job.stream_url) return null;
@@ -71,6 +72,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ job, onReset }) => {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {onOpenExport && (
+            <button
+              type="button"
+              onClick={onOpenExport}
+              className="btn-secondary flex items-center gap-2 text-xs md:text-sm py-2 px-3 text-zinc-300 hover:text-white"
+              title="Change Resolution (1080p), FPS, or Audio Volume"
+            >
+              <Sliders size={15} className="text-orange-400" />
+              <span>Export Options</span>
+            </button>
+          )}
           <a
             href={downloadUrl}
             download={`FotoOwl_Reel_${job.id.slice(0, 8)}.mp4`}
@@ -125,6 +137,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ job, onReset }) => {
             <ExternalLink size={14} />
             <span>Open in Fullscreen</span>
           </a>
+
+          {onOpenExport && (
+            <button
+              type="button"
+              onClick={onOpenExport}
+              className="btn-secondary flex items-center gap-2 px-4 py-2.5 text-orange-300 hover:text-orange-200 border-orange-500/30 hover:border-orange-500/50"
+            >
+              <Sliders size={15} />
+              <span>Export Settings (1080p / 60fps)</span>
+            </button>
+          )}
 
           <button onClick={onReset} className="btn-secondary flex items-center gap-2 px-4 py-2.5">
             <RotateCcw size={15} />

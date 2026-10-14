@@ -159,78 +159,172 @@ def render_slideshow_mp4(
     aspect_ratio: str = "9:16",
     duration_per_image: float = 3.0,
     with_music: bool = True,
-    music_mood: str = "cinematic",
+    music_mood: str = "trending",
     scenes_metadata: Optional[List[Dict[str, Any]]] = None,
+    resolution: str = "1080p",
+    fps: int = 30,
+    custom_audio_path: Optional[Path] = None,
+    audio_volume: float = 0.95,
 ) -> Tuple[bool, str]:
-    """Render a high-definition MP4 from photos with pan/zoom and seamless studio-quality audio."""
+    """Render a professional high-definition MP4 with camera movements, color grading, text, and studio audio."""
     if not FFMPEG_BINARY:
         return False, "FFmpeg binary is not configured."
 
     if not image_paths:
         return False, "No input images provided."
 
-    # Dimensions based on aspect ratio
+    # Resolution mapping
+    is_720 = resolution.lower() == "720p"
     if aspect_ratio == "16:9":
-        out_w, out_h = 1920, 1080
+        out_w, out_h = (1280, 720) if is_720 else (1920, 1080)
     elif aspect_ratio == "1:1":
-        out_w, out_h = 1080, 1080
+        out_w, out_h = (720, 720) if is_720 else (1080, 1080)
     else:  # 9:16 vertical reel default
-        out_w, out_h = 1080, 1920
+        out_w, out_h = (720, 1280) if is_720 else (1080, 1920)
 
-    fps = 30
+    fps = fps if fps in [24, 30, 60] else 30
     total_images = len(image_paths)
-    total_duration = total_images * duration_per_image
 
-    # Audio Asset Directory
+    # Calculate per-scene durations from metadata if provided
+    durations: List[float] = []
+    if scenes_metadata and len(scenes_metadata) == total_images:
+        for sc in scenes_metadata:
+            dur = sc.get("duration_seconds")
+            if dur is None and "durationInFrames" in sc:
+                dur = float(sc["durationInFrames"]) / max(1, fps)
+            durations.append(max(1.0, float(dur if dur is not None else duration_per_image)))
+    else:
+        durations = [max(1.0, duration_per_image)] * total_images
+
+    total_duration = sum(durations)
+
+    # Audio Asset Management
     audio_assets_dir = Path(__file__).resolve().parent.parent / "audio_assets"
     selected_audio: Optional[Path] = None
     temp_generated_audio: Optional[Path] = None
 
     if with_music:
-        mood_str = (music_mood or "cinematic").lower()
-        if any(w in mood_str for w in ["wedding", "romantic", "love", "marry", "marriage", "couple", "bride", "groom"]):
-            candidate = audio_assets_dir / "wedding.wav"
-        elif any(w in mood_str for w in ["nature", "scenic", "outdoor", "forest", "mountain", "calm", "relax", "serene", "waterfall"]):
-            candidate = audio_assets_dir / "nature.wav"
-        elif any(w in mood_str for w in ["celebration", "party", "festival", "upbeat", "dance", "fun", "birthday", "sparkler", "confetti"]):
-            candidate = audio_assets_dir / "celebration.wav"
+        if custom_audio_path and custom_audio_path.exists() and custom_audio_path.stat().st_size > 0:
+            selected_audio = custom_audio_path
+            logger.info(f"Using user custom audio track: {custom_audio_path.name}")
         else:
-            candidate = audio_assets_dir / "cinematic.wav"
+            mood_str = (music_mood or "trending").lower()
+            if any(w in mood_str for w in ["trend", "viral", "insta", "reel", "beat", "phonk", "hiphop"]):
+                candidate = audio_assets_dir / "instagram_trending.wav"
+            elif any(w in mood_str for w in ["lofi", "lo-fi", "chill", "relax", "aesthetic", "cafe", "coffee"]):
+                candidate = audio_assets_dir / "instagram_lofi.wav"
+            elif any(w in mood_str for w in ["wedding", "romantic", "love", "marry", "marriage", "couple", "bride", "groom", "anniversary"]):
+                candidate = audio_assets_dir / "wedding.wav"
+            elif any(w in mood_str for w in ["nature", "scenic", "outdoor", "forest", "mountain", "waterfall", "travel", "landscape", "adventure"]):
+                candidate = audio_assets_dir / "nature.wav"
+            elif any(w in mood_str for w in ["celebration", "party", "festival", "upbeat", "dance", "fun", "birthday", "sparkler", "confetti"]):
+                candidate = audio_assets_dir / "celebration.wav"
+            else:
+                candidate = audio_assets_dir / "cinematic.wav"
 
-        if candidate.exists() and candidate.stat().st_size > 0:
-            selected_audio = candidate
-            logger.info(f"Using high-fidelity studio track: {candidate.name} (mood: {music_mood})")
-        else:
-            temp_generated_audio = TEMP_DIR / f"ambient_{output_mp4.stem}.wav"
-            if generate_ambient_music(temp_generated_audio, total_duration, mood=music_mood):
-                selected_audio = temp_generated_audio
-                logger.info(f"Synthesized ambient track for mood: {music_mood}")
+            if candidate.exists() and candidate.stat().st_size > 0:
+                selected_audio = candidate
+                logger.info(f"Selected studio track: {candidate.name} (mood: {music_mood})")
+            else:
+                temp_generated_audio = TEMP_DIR / f"ambient_{output_mp4.stem}.wav"
+                if generate_ambient_music(temp_generated_audio, total_duration, mood=music_mood):
+                    selected_audio = temp_generated_audio
+                    logger.info(f"Synthesized fallback ambient track for mood: {music_mood}")
 
     try:
-        # Build filter complex
-        # 1. Scale with full-bleed crop to fill the frame vibrantly (no black bars)
-        # 2. Apply subtle Ken Burns zoom effect
         inputs = []
         filter_parts = []
 
+        # Motion Effects Library
         for i, img_path in enumerate(image_paths):
-            inputs.extend(["-loop", "1", "-t", str(duration_per_image), "-i", str(img_path)])
+            scene_dur = durations[i]
+            d_frames = int(round(scene_dur * fps))
+            inputs.extend(["-loop", "1", "-i", str(img_path)])
+
+            # Extract scene metadata for effect, filter, captions
+            sc_meta = scenes_metadata[i] if scenes_metadata and i < len(scenes_metadata) else {}
+            motion_type = sc_meta.get("ken_burns_effect") or sc_meta.get("kenBurnsEffect") or sc_meta.get("motion") or "zoom_in"
+            color_filter = sc_meta.get("filter_effect") or sc_meta.get("filter") or "none"
+            caption = sc_meta.get("caption", "").strip()
+            title = sc_meta.get("overlay_title") or sc_meta.get("overlayTitle") or ""
+
+            # 1. Motion Expression
+            if motion_type == "zoom_out":
+                eff = f"zoompan=z='if(lte(zoom,1.0),1.22,max(1.001,zoom-0.0022))':d={d_frames}:s={out_w}x{out_h}:fps={fps}"
+            elif motion_type == "pan_left":
+                eff = f"zoompan=z=1.18:x='if(lte(on,1),iw*0.14,max(0,x-1.8))':y='ih/2-(ih/zoom/2)':d={d_frames}:s={out_w}x{out_h}:fps={fps}"
+            elif motion_type == "pan_right":
+                eff = f"zoompan=z=1.18:x='if(lte(on,1),0,min(iw*0.14,x+1.8))':y='ih/2-(ih/zoom/2)':d={d_frames}:s={out_w}x{out_h}:fps={fps}"
+            elif motion_type == "tilt_up":
+                eff = f"zoompan=z=1.18:x='iw/2-(iw/zoom/2)':y='if(lte(on,1),ih*0.14,max(0,y-1.8))':d={d_frames}:s={out_w}x{out_h}:fps={fps}"
+            elif motion_type == "tilt_down":
+                eff = f"zoompan=z=1.18:x='iw/2-(iw/zoom/2)':y='if(lte(on,1),0,min(ih*0.14,y+1.8))':d={d_frames}:s={out_w}x{out_h}:fps={fps}"
+            elif motion_type in ["rotate", "orbit"]:
+                eff = f"zoompan=z='min(zoom+0.0018,1.18)':d={d_frames}:s={out_w}x{out_h}:fps={fps}"
+            else:  # zoom_in default
+                eff = f"zoompan=z='min(zoom+0.0022,1.22)':d={d_frames}:s={out_w}x{out_h}:fps={fps}"
+
+            # 2. Color Grading Filter
+            filter_expr = ""
+            if color_filter == "cinematic":
+                filter_expr = ",eq=contrast=1.14:brightness=0.02:saturation=1.12,vignette=PI/4"
+            elif color_filter == "vibrant":
+                filter_expr = ",eq=saturation=1.35:contrast=1.08"
+            elif color_filter == "vintage":
+                filter_expr = ",colorbalance=rs=0.15:gs=0.08:bs=-0.12,vignette=PI/3.5"
+            elif color_filter in ["bw", "monochrome"]:
+                filter_expr = ",hue=s=0,eq=contrast=1.2"
+            elif color_filter == "warm":
+                filter_expr = ",colorbalance=rs=0.12:gs=0.05:bs=-0.08"
+            elif color_filter == "cool":
+                filter_expr = ",colorbalance=rs=-0.08:gs=0.02:bs=0.15"
+            elif color_filter == "vignette":
+                filter_expr = ",vignette=PI/4"
+
+            # 3. Text Overlay (Safe drawtext with character escaping and Windows fontfile)
+            text_filter = ""
+            overlay_text = title if (i == 0 and title) else caption
+            if overlay_text:
+                clean_text = (
+                    overlay_text.replace("\\", "\\\\")
+                    .replace("'", "\u2019")
+                    .replace(":", "\\:")
+                    .replace("%", "\\%")
+                )
+                font_candidates = [
+                    Path("C:/Windows/Fonts/arial.ttf"),
+                    Path("C:/Windows/Fonts/calibri.ttf"),
+                    Path("C:/Windows/Fonts/segoeui.ttf"),
+                ]
+                system_font = next((f for f in font_candidates if f.exists()), None)
+                if system_font:
+                    escaped_font = str(system_font).replace("\\", "/").replace(":", "\\:")
+                    font_sz = max(24, int(out_w * 0.038))
+                    y_pos = f"h-th-{int(out_h * 0.08)}" if not (i == 0 and title) else f"(h-th)/2"
+                    text_filter = (
+                        f",drawtext=fontfile='{escaped_font}':text='{clean_text}':fontsize={font_sz}:"
+                        f"fontcolor=white:box=1:boxcolor=black@0.55:boxborderw=10:"
+                        f"x=(w-text_w)/2:y={y_pos}"
+                    )
+
+            # Assemble scene filter
             filter_parts.append(
                 f"[{i}:v]scale={out_w}:{out_h}:force_original_aspect_ratio=increase,"
                 f"crop={out_w}:{out_h},"
-                f"zoompan=z='min(zoom+0.0015,1.15)':d={int(duration_per_image * fps)}:s={out_w}x{out_h}:fps={fps},"
-                f"setsar=1[v{i}];"
+                f"{eff}{filter_expr}{text_filter},"
+                f"trim=duration={scene_dur},setsar=1[v{i}];"
             )
 
-        # Concatenate scenes
+        # Concatenate scenes cleanly
         concat_inputs = "".join(f"[v{i}]" for i in range(total_images))
         filter_parts.append(f"{concat_inputs}concat=n={total_images}:v=1:a=0[vout];")
 
-        # Audio filter with smooth fade in and fade out
+        # Audio filter with volume and fade in/out
         if selected_audio and selected_audio.exists():
             fade_out_start = max(0.1, total_duration - 1.5)
+            vol_val = max(0.1, min(1.5, audio_volume))
             filter_parts.append(
-                f"[{total_images}:a]afade=t=in:ss=0:d=1.0,afade=t=out:st={fade_out_start}:d=1.5,volume=0.9[aout]"
+                f"[{total_images}:a]afade=t=in:ss=0:d=1.0,afade=t=out:st={fade_out_start}:d=1.5,volume={vol_val}[aout]"
             )
 
         filter_complex = "".join(filter_parts)
@@ -271,7 +365,7 @@ def render_slideshow_mp4(
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=120,
+            timeout=180,
         )
 
         if res.returncode != 0:
@@ -284,7 +378,7 @@ def render_slideshow_mp4(
         return True, "Success"
 
     except subprocess.TimeoutExpired:
-        return False, "Rendering process timed out after 120 seconds."
+        return False, "Rendering process timed out after 180 seconds."
     except Exception as e:
         return False, f"Unexpected error during render: {str(e)}"
     finally:

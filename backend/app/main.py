@@ -8,10 +8,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.api.audio import router as audio_router
 from app.api.health import router as health_router
 from app.api.jobs import router as jobs_router
 from app.api.models import router as models_router
 from app.api.samples import router as samples_router
+from app.api.templates import router as templates_router
 from app.api.uploads import router as uploads_router
 from app.config import FRONTEND_DIST_DIR, OUTPUT_DIR, UPLOAD_DIR
 from app.database import init_db
@@ -60,6 +62,8 @@ app.include_router(uploads_router)
 app.include_router(jobs_router)
 app.include_router(models_router)
 app.include_router(samples_router)
+app.include_router(audio_router)
+app.include_router(templates_router)
 
 # Mount Frontend Assets for All-in-One Serving
 assets_dir = FRONTEND_DIST_DIR / "assets"
