@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+backend/.venv/
+.venv/
+venv/
+ENV/
+*.env
+!.env.example
+
+# Testing & Caching
+.pytest_cache/
+.coverage
+htmlcov/
+
+# SQLite & Runtime Storage
+backend/storage/uploads/*
+!backend/storage/uploads/.gitkeep
+backend/storage/outputs/*
+!backend/storage/outputs/.gitkeep
+backend/storage/temp/*
+!backend/storage/temp/.gitkeep
+backend/storage/*.db
+backend/storage/*.db-wal
+backend/storage/*.db-shm
+*.db
+
+# Node / Remotion / Frontend
+node_modules/
+frontend/node_modules/
+remotion/node_modules/
+frontend/dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
