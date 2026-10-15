@@ -39,6 +39,7 @@ import { VideoPlayer } from './components/VideoPlayer';
 import { LogsConsole } from './components/LogsConsole';
 import { JobHistory } from './components/JobHistory';
 import { OllamaModal } from './components/OllamaModal';
+import { QrModal } from './components/QrModal';
 import {
   CheckCircle2,
   AlertCircle,
@@ -82,6 +83,7 @@ export const App: React.FC = () => {
   const [isOllamaModalOpen, setIsOllamaModalOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
 
   // Loading States
   const [isUploading, setIsUploading] = useState(false);
@@ -487,6 +489,7 @@ export const App: React.FC = () => {
         health={health}
         onOpenOllamaModal={() => setIsOllamaModalOpen(true)}
         onOpenHistory={() => setIsHistoryOpen(true)}
+        onOpenQrModal={() => setIsQrModalOpen(true)}
         historyCount={jobsList.length}
       />
 
@@ -796,6 +799,15 @@ export const App: React.FC = () => {
         onClose={() => setIsOllamaModalOpen(false)}
         models={models}
         onRefresh={loadHealthAndModels}
+      />
+
+      {/* Mobile QR Scanner Modal */}
+      <QrModal
+        isOpen={isQrModalOpen}
+        onClose={() => setIsQrModalOpen(false)}
+        publicUrl="https://soft-sheep-62.loca.lt"
+        localWifiUrl="http://10.106.152.185:8000"
+        tunnelPassword="152.57.50.187"
       />
     </div>
   );

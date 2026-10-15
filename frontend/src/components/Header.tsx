@@ -1,11 +1,12 @@
 import React from 'react';
-import { Film, Cpu, HardDrive, History, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Film, Cpu, HardDrive, History, CheckCircle2, AlertCircle, QrCode } from 'lucide-react';
 import type { HealthStatus } from '../types';
 
 interface HeaderProps {
   health: HealthStatus | null;
   onOpenOllamaModal: () => void;
   onOpenHistory: () => void;
+  onOpenQrModal?: () => void;
   historyCount: number;
 }
 
@@ -13,6 +14,7 @@ export const Header: React.FC<HeaderProps> = ({
   health,
   onOpenOllamaModal,
   onOpenHistory,
+  onOpenQrModal,
   historyCount,
 }) => {
   return (
@@ -31,6 +33,18 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       <div className="header-actions">
+        {/* Mobile View QR Scanner Button */}
+        {onOpenQrModal && (
+          <button
+            onClick={onOpenQrModal}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-orange-500/20 to-amber-500/20 hover:from-orange-500/30 hover:to-amber-500/30 text-orange-300 border border-orange-500/40 text-xs font-bold transition-all shadow-sm shadow-orange-500/10 cursor-pointer"
+            title="Scan QR Code to open FotoOwl on your mobile phone"
+          >
+            <QrCode size={15} className="text-orange-400" />
+            <span>Mobile Scanner</span>
+          </button>
+        )}
+
         {/* Ollama Status Pill */}
         <button
           onClick={onOpenOllamaModal}
