@@ -224,7 +224,7 @@ export async function applyTemplate(
   templateId: string,
   jobId?: string,
   prompt?: string
-): Promise<{ message: string; job_id: string; template: VideoTemplate }> {
+): Promise<{ message: string; job_id: string; template: VideoTemplate; image_count?: number; images?: ImageItem[] }> {
   const res = await fetch(`${API_BASE}/api/templates/${encodeURIComponent(templateId)}/apply`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -243,7 +243,7 @@ export async function fetchAudioCatalog(): Promise<AudioTrack[]> {
 export async function uploadCustomAudio(
   file: File,
   jobId?: string
-): Promise<{ filename: string; preview_url: string; file_path: string }> {
+): Promise<{ filename: string; preview_url: string; file_path: string; track?: AudioTrack }> {
   const formData = new FormData();
   formData.append('file', file);
   if (jobId) formData.append('job_id', jobId);

@@ -67,8 +67,21 @@ def apply_template(template_id: str, payload: Optional[ApplyTemplateRequest] = N
         style=tmpl["category"],
     )
 
+    # If no photos currently attached, auto-attach matching themed photos
+    current_images = get_job_images(job_id)
+    if len(current_images) == 0:
+        from app.services.sample_packs import load_sample_pack_into_job
+        pack_id = "nature" if any(k in template_id.lower() for k in ["nature", "travel", "cinematic"]) else "wedding"
+        try:
+            res = load_sample_pack_into_job(pack_id=pack_id, job_id=job_id)
+            current_images = res.get("images", [])
+        except Exception:
+            pass
+
     return {
-        "message": f"Template '{tmpl['title']}' applied successfully.",
+        "message": f"Template '{tmpl['title']}' applied successfully with {len(current_images)} photos.",
         "job_id": job_id,
         "template": tmpl,
+        "image_count": len(current_images),
+        "images": current_images,
     }

@@ -209,7 +209,35 @@ def render_slideshow_mp4(
             logger.info(f"Using user custom audio track: {custom_audio_path.name}")
         else:
             mood_str = (music_mood or "trending").lower()
-            if any(w in mood_str for w in ["trend", "viral", "insta", "reel", "beat", "phonk", "hiphop"]):
+            direct_file = audio_assets_dir / (mood_str if mood_str.endswith(".wav") else f"{mood_str}.wav")
+
+            if direct_file.exists():
+                candidate = direct_file
+            elif "golden_hour" in mood_str or "golden" in mood_str:
+                candidate = audio_assets_dir / "golden_hour.wav"
+            elif "inspire" in mood_str:
+                candidate = audio_assets_dir / "inspire_the_world.wav"
+            elif "let_him_cook" in mood_str or "cook" in mood_str:
+                candidate = audio_assets_dir / "let_him_cook.wav"
+            elif "veena" in mood_str:
+                candidate = audio_assets_dir / "veena_dreams.wav"
+            elif "durgashtakam" in mood_str or "durga" in mood_str:
+                candidate = audio_assets_dir / "durgashtakam.wav"
+            elif "aarohanam" in mood_str:
+                candidate = audio_assets_dir / "aarohanam.wav"
+            elif "roi" in mood_str and "slow" in mood_str:
+                candidate = audio_assets_dir / "roi_slowed.wav"
+            elif "roi" in mood_str:
+                candidate = audio_assets_dir / "roi_instrumental.wav"
+            elif "dreamcore" in mood_str:
+                candidate = audio_assets_dir / "dreamcore.wav"
+            elif "hotline" in mood_str:
+                candidate = audio_assets_dir / "hotline_bling.wav"
+            elif "richi" in mood_str:
+                candidate = audio_assets_dir / "richi_theme.wav"
+            elif "seeing_eye" in mood_str or "all_seeing" in mood_str or "meditation" in mood_str:
+                candidate = audio_assets_dir / "the_all_seeing_eye.wav"
+            elif any(w in mood_str for w in ["trend", "viral", "insta", "reel", "beat", "phonk", "hiphop"]):
                 candidate = audio_assets_dir / "instagram_trending.wav"
             elif any(w in mood_str for w in ["lofi", "lo-fi", "chill", "relax", "aesthetic", "cafe", "coffee"]):
                 candidate = audio_assets_dir / "instagram_lofi.wav"

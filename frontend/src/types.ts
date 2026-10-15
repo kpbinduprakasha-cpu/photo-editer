@@ -133,14 +133,20 @@ export interface VideoTemplate {
 export interface AudioTrack {
   id: string;
   title: string;
+  artist?: string;
+  duration_text?: string;
   category: string;
   genre: string;
   mood: string;
   filename: string;
   description: string;
-  bpm: number;
+  bpm?: number;
+  trending?: boolean;
+  tab?: string;
+  cover_gradient?: string;
   license: string;
   preview_url: string;
+  is_custom?: boolean;
 }
 
 export interface ExportSettings {
