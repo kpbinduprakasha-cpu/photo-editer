@@ -871,9 +871,9 @@ export const App: React.FC = () => {
       <QrModal
         isOpen={isQrModalOpen}
         onClose={() => setIsQrModalOpen(false)}
-        publicUrl="https://soft-sheep-62.loca.lt"
+        publicUrl="https://whole-lemons-reply.loca.lt"
         localWifiUrl="http://10.106.152.185:8000"
-        tunnelPassword="152.57.50.187"
+        tunnelPassword="152.57.62.98"
       />
     </div>
   );
