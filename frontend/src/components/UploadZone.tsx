@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { UploadCloud, FolderUp, X, Image as ImageIcon } from 'lucide-react';
+import { UploadCloud, FolderUp, X, Sparkles } from 'lucide-react';
 import type { ImageItem } from '../types';
 import { getFileUrl } from '../api';
 
@@ -7,6 +7,7 @@ interface UploadZoneProps {
   images: ImageItem[];
   onFilesSelected: (files: File[]) => void;
   onRemoveImage: (imageId: string) => void;
+  onQuickSamplePack?: (packId: string) => void;
   isUploading: boolean;
   disabled: boolean;
 }
@@ -15,6 +16,7 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
   images,
   onFilesSelected,
   onRemoveImage,
+  onQuickSamplePack,
   isUploading,
   disabled,
 }) => {
@@ -53,18 +55,13 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
     }
   };
 
-  return (
-    <div className="card-panel">
-      <div className="panel-header">
-        <div className="flex items-center gap-2">
-          <ImageIcon className="text-orange-400" size={18} />
-          <h2 className="panel-title">1. Upload Photographs</h2>
-        </div>
-        <span className="photo-count-badge">
-          {images.length} {images.length === 1 ? 'Photo' : 'Photos'} Selected
-        </span>
-      </div>
+  const getKenBurnsBadge = (idx: number) => {
+    const moves = ['Zoom In', 'Pan Right', 'Tilt Up', 'Zoom Out', 'Pan Left', 'Dynamic Drift'];
+    return moves[idx % moves.length];
+  };
 
+  return (
+    <div className="space-y-3">
       {/* Drag & Drop Target Box */}
       <div
         className={`dropzone-box ${isDragOver ? 'dropzone-active' : ''} ${disabled ? 'dropzone-disabled' : ''}`}
@@ -97,14 +94,14 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
 
         <div className="dropzone-content">
           <div className="dropzone-icon-wrap">
-            <UploadCloud size={32} className="text-orange-400" />
+            <UploadCloud size={30} className="text-orange-400" />
           </div>
           <div className="dropzone-text">
             <p className="dropzone-title">
-              {isUploading ? 'Uploading & verifying photos...' : 'Drag & drop photos here, or click to browse'}
+              {isUploading ? 'Validating & optimizing photos...' : 'Drag & drop photos here, or click to browse'}
             </p>
             <p className="dropzone-hint">
-              Supports JPEG, PNG, and WebP (up to 50MB each). Photos will be automatically ordered and analysed.
+              Supports JPEG, PNG, WebP • Auto-compressed • Preserves faces & scenery
             </p>
           </div>
           <div className="dropzone-buttons" onClick={(e) => e.stopPropagation()}>
@@ -128,39 +125,89 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
         </div>
       </div>
 
+      {/* Quick Sample Photos Shortcut Strip */}
+      {onQuickSamplePack && (
+        <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs">
+          <span className="text-zinc-400 font-medium flex items-center gap-1.5">
+            <Sparkles size={14} className="text-amber-400" />
+            <span>Don't have photos handy? Try demo pack:</span>
+          </span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              type="button"
+              onClick={() => onQuickSamplePack('wedding-pack')}
+              disabled={disabled || isUploading}
+              className="px-2.5 py-1 rounded-lg bg-pink-500/10 hover:bg-pink-500/20 text-pink-300 border border-pink-500/20 font-semibold transition-colors"
+            >
+              💒 Wedding
+            </button>
+            <button
+              type="button"
+              onClick={() => onQuickSamplePack('nature-pack')}
+              disabled={disabled || isUploading}
+              className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/20 font-semibold transition-colors"
+            >
+              🌲 Nature
+            </button>
+            <button
+              type="button"
+              onClick={() => onQuickSamplePack('celebration-pack')}
+              disabled={disabled || isUploading}
+              className="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 font-semibold transition-colors"
+            >
+              🎉 City/Celebration
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Uploaded Photos Grid Preview */}
       {images.length > 0 && (
-        <div className="photo-grid">
-          {images.map((img, idx) => (
-            <div key={img.id} className="photo-card group">
-              <img
-                src={getFileUrl(img.preview_url)}
-                alt={img.original_filename}
-                className="photo-thumbnail"
-              />
-              <div className="photo-overlay">
-                <span className="photo-index">#{idx + 1}</span>
-                {!disabled && (
-                  <button
-                    onClick={() => onRemoveImage(img.id)}
-                    className="photo-remove-btn"
-                    title="Remove photo"
-                  >
-                    <X size={14} />
-                  </button>
-                )}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs text-zinc-400 px-1">
+            <span className="font-semibold text-zinc-300">
+              Choreographed Scenes ({images.length})
+            </span>
+            <span>Hover to preview motion assignment</span>
+          </div>
+
+          <div className="photo-grid">
+            {images.map((img, idx) => (
+              <div key={img.id} className="photo-card group">
+                <img
+                  src={getFileUrl(img.preview_url)}
+                  alt={img.original_filename}
+                  className="photo-thumbnail group-hover:scale-105 transition-transform duration-300"
+                />
+                <div className="photo-overlay">
+                  <span className="photo-index">#{idx + 1}</span>
+                  {!disabled && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemoveImage(img.id);
+                      }}
+                      className="photo-remove-btn"
+                      title="Remove photo"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+
+                <div className="photo-info">
+                  <div className="flex items-center justify-between">
+                    <span className="photo-name font-bold text-zinc-200" title={img.original_filename}>
+                      {img.original_filename}
+                    </span>
+                  </div>
+                  <span className="text-[9px] font-mono font-semibold text-orange-400 mt-0.5">
+                    {getKenBurnsBadge(idx)}
+                  </span>
+                </div>
               </div>
-              <div className="photo-info">
-                <span className="photo-name" title={img.original_filename}>
-                  {img.original_filename}
-                </span>
-                <span className="photo-meta">
-                  {img.width && img.height ? `${img.width}x${img.height} • ` : ''}
-                  {Math.round(img.file_size / 1024)} KB
-                </span>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
     </div>

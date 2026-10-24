@@ -15,6 +15,7 @@ import {
   fetchModels,
   fetchAllJobs,
   fetchAudioCatalog,
+  applySamplePack,
   createJob,
   uploadPhotos,
   startJob,
@@ -325,6 +326,21 @@ export const App: React.FC = () => {
     setUploadedImages((prev) => prev.filter((img) => img.id !== imageId));
   };
 
+  // Handle 1-Click Quick Demo Sample Pack
+  const handleQuickSamplePack = async (packId: string) => {
+    setIsUploading(true);
+    try {
+      const res = await applySamplePack(packId, currentJob?.id, prompt);
+      setCurrentJob(res.job);
+      setUploadedImages(res.images);
+      showToast(`📸 Loaded sample pack "${res.pack.name}". Click "CREATE VIDEO REEL NOW"!`, 'success');
+    } catch (err: any) {
+      showToast(`Failed to load sample pack: ${err.message}`, 'error');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   // Handle 1-Click Create Reel Video
   const handleCreateVideo = async () => {
     if (uploadedImages.length === 0 || isUploading) {
@@ -524,6 +540,44 @@ export const App: React.FC = () => {
       )}
 
       <main className="main-layout flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
+        {/* Studio Workflow Guidance Rail (UX Step Ribbon) */}
+        <div className="workflow-rail">
+          <div
+            className={`workflow-step ${
+              selectedTemplateId ? 'active completed' : 'active'
+            }`}
+          >
+            <span className="step-num-badge">1</span>
+            <span>1. Choose Style</span>
+          </div>
+
+          <div className="workflow-divider" />
+
+          <div
+            className={`workflow-step ${
+              uploadedImages.length > 0 ? 'active completed' : selectedTemplateId ? 'active' : ''
+            }`}
+          >
+            <span className="step-num-badge">2</span>
+            <span>2. Photos ({uploadedImages.length}) & Soundtrack</span>
+          </div>
+
+          <div className="workflow-divider" />
+
+          <div
+            className={`workflow-step ${
+              currentJob?.status === 'completed'
+                ? 'active completed'
+                : isGenerating
+                ? 'active'
+                : ''
+            }`}
+          >
+            <span className="step-num-badge">3</span>
+            <span>3. 1080p MP4 Synthesis</span>
+          </div>
+        </div>
+
         {/* SECTION 1: The 8 Template Boxes (Screenshot 1: Wedding, Nature, Reels, etc.) */}
         <TemplatesSelector
           currentJobId={currentJob?.id}
@@ -539,18 +593,18 @@ export const App: React.FC = () => {
             <div className="lg:col-span-7 space-y-3">
               <div className="flex items-center justify-between pb-1 border-b border-zinc-800">
                 <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-orange-400 animate-pulse" />
                   <h3 className="text-sm font-bold text-zinc-100">
                     Photos for Reel ({uploadedImages.length} Ready)
                   </h3>
                   {selectedTemplate && (
-                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/30 truncate max-w-[200px]">
+                    <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/30 truncate max-w-[200px] font-semibold">
                       {selectedTemplate.title}
                     </span>
                   )}
                 </div>
                 <span className="text-xs text-zinc-400">
-                  {uploadedImages.length > 0 ? '✓ Ready to render' : 'Upload or select style'}
+                  {uploadedImages.length > 0 ? '✓ Ready for synthesis' : 'Upload or pick demo pack'}
                 </span>
               </div>
 
@@ -558,6 +612,7 @@ export const App: React.FC = () => {
                 images={uploadedImages}
                 onFilesSelected={handleFilesSelected}
                 onRemoveImage={handleRemoveImage}
+                onQuickSamplePack={handleQuickSamplePack}
                 isUploading={isUploading}
                 disabled={isGenerating}
               />
@@ -585,7 +640,7 @@ export const App: React.FC = () => {
                 {selectedTrack ? (
                   <div
                     onClick={() => setIsMusicModalOpen(true)}
-                    className="flex items-center justify-between p-3 rounded-xl bg-zinc-900/90 border border-zinc-800 hover:border-orange-500/50 cursor-pointer transition-all group"
+                    className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-900/90 border border-zinc-800 hover:border-orange-500/50 cursor-pointer transition-all group"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       {/* Album Cover Art */}
@@ -612,8 +667,19 @@ export const App: React.FC = () => {
                       </div>
 
                       <div className="min-w-0">
-                        <div className="text-sm font-bold text-zinc-100 truncate group-hover:text-orange-300 transition-colors">
-                          {selectedTrack.title}
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-zinc-100 truncate group-hover:text-orange-300 transition-colors">
+                            {selectedTrack.title}
+                          </span>
+                          {isPlayingAudio && (
+                            <div className="sound-bars-wrap shrink-0">
+                              <span className="sound-bar" />
+                              <span className="sound-bar" />
+                              <span className="sound-bar" />
+                              <span className="sound-bar" />
+                              <span className="sound-bar" />
+                            </div>
+                          )}
                         </div>
                         <div className="text-xs text-zinc-400 truncate mt-0.5">
                           {selectedTrack.artist || 'FotoOwl Studio'} • {selectedTrack.duration_text || '1:00'}
@@ -627,7 +693,7 @@ export const App: React.FC = () => {
                         e.stopPropagation();
                         setIsMusicModalOpen(true);
                       }}
-                      className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-zinc-800 text-zinc-300 hover:bg-orange-500 hover:text-white transition-all shrink-0"
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-800 text-zinc-300 hover:bg-orange-500 hover:text-white transition-all shrink-0"
                     >
                       Browse
                     </button>
